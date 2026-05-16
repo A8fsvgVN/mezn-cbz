@@ -7,6 +7,14 @@ export interface PageInfo {
 }
 
 export const getNormalizedUrl = (url: string) => {
+    if (url.startsWith('blob:')) {
+        const hashIndex = url.indexOf('#');
+        if (hashIndex !== -1) {
+            return `local-${decodeURIComponent(url.substring(hashIndex + 1))}`;
+        }
+        return 'local-file';
+    }
+
     try {
         const u = new URL(url);
         ['token', 'sign', 'e', 'auth', 'expires', 'Signature'].forEach(p => u.searchParams.delete(p));
@@ -14,7 +22,7 @@ export const getNormalizedUrl = (url: string) => {
     } catch {
         return url;
     }
-}; 
+};
 
 export const useComicReader = (targetUrl: string | null) => {
   const [pages, setPages] = useState<PageInfo[]>([]); 
@@ -45,10 +53,15 @@ export const useComicReader = (targetUrl: string | null) => {
       urlCache.current.clear();
 
       try {
-        const proxyUrl = `/proxy?url=${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(proxyUrl);
-        
-        if (!res.ok || !res.body) throw new Error(`网络请求失败: HTTP ${res.status}`);
+        let res;
+        if (targetUrl.startsWith('blob:')) {
+            res = await fetch(targetUrl);
+        } else {
+            const proxyUrl = `/proxy?url=${encodeURIComponent(targetUrl)}`;
+            res = await fetch(proxyUrl);
+        }
+
+        if (!res.ok || !res.body) throw new Error(`请求失败: HTTP ${res.status}`);
 
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('text/html')) {

@@ -7,12 +7,25 @@ import clsx from 'clsx';
 
 function App() {
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const url = params.get('url');
     if (url) setTargetUrl(url);
   }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        if (targetUrl?.startsWith('blob:')) {
+            URL.revokeObjectURL(targetUrl.split('#')[0]);
+        }
+        const localBlobUrl = URL.createObjectURL(file) + '#' + encodeURIComponent(file.name);
+        setTargetUrl(localBlobUrl);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const { loading, error, currentPage, pages, goNext, goPrev, jumpTo, isDone } = useComicReader(targetUrl);
   
@@ -86,8 +99,25 @@ function App() {
   };
 
   if (!targetUrl) return (
-    <div className="flex items-center justify-center h-screen w-full bg-black text-gray-400 p-4">
-        在 URL 加上 ?url=CBZ链接
+    <div className="flex flex-col items-center justify-center h-screen w-full bg-black text-gray-400 p-4 gap-6 tracking-wide">
+        <div>在 URL 加上 ?url=CBZ链接</div>
+        
+        {/* 点击这行文字唤起文件选择器 */}
+        <div 
+            className="cursor-pointer hover:text-gray-200 transition-colors duration-200"
+            onClick={() => fileInputRef.current?.click()}
+        >
+            打开本地漫画
+        </div>
+        
+        {/* 隐藏的 input */}
+        <input 
+            type="file" 
+            accept=".cbz,.zip" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+        />
     </div>
   );
 
