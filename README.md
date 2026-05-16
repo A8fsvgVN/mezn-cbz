@@ -1,9 +1,13 @@
 # mezn-cbz
 
-框架预设：`React (Vite)`
+> 代码由 gemini 生成
 
-构建命令：`npm run build`
+**Cloudflare Pages 部署参数**
 
-构建输出目录：`/dist`
+- 框架预设：`React (Vite)`
 
-环境变量（高级）：添加变量 `NODE_VERSION` = `24`
+- 构建命令：`npm run build`
+
+- 构建输出目录：`/dist`
+
+- 环境变量（高级）：添加变量 `NODE_VERSION` = `24`
