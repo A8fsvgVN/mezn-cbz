@@ -17,10 +17,23 @@ export const getNormalizedUrl = (url: string) => {
 
     try {
         const u = new URL(url);
-        ['token', 'sign', 'e', 'auth', 'expires', 'Signature'].forEach(p => u.searchParams.delete(p));
-        return u.toString();
+        const disposition = u.searchParams.get('response-content-disposition');
+        if (disposition) {
+            const match = disposition.match(/filename\*=UTF-8''([^&;]+)/) || disposition.match(/filename="?([^";]+)"?/);
+            if (match && match[1]) {
+                return `net-file-${decodeURIComponent(match[1])}`;
+            }
+        }
+
+        [
+            'token', 'sign', 'e', 'auth', 'expires', 'Signature', 
+            'X-Amz-Date', 'X-Amz-Signature', 'X-Amz-Credential', 'X-Amz-Algorithm', 'X-Amz-Expires', 
+            't', 'u', 'oi', 'ot'
+        ].forEach(p => u.searchParams.delete(p));
+        
+        return u.toString(); 
     } catch {
-        return url;
+        return url.split('?')[0];
     }
 };
 
