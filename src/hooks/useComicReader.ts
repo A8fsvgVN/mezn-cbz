@@ -6,12 +6,23 @@ export interface PageInfo {
     url: string;
 }
 
+export const getNormalizedUrl = (url: string) => {
+    try {
+        const u = new URL(url);
+        ['token', 'sign', 'e', 'auth', 'expires', 'Signature'].forEach(p => u.searchParams.delete(p));
+        return u.toString();
+    } catch {
+        return url;
+    }
+}; 
+
 export const useComicReader = (targetUrl: string | null) => {
   const [pages, setPages] = useState<PageInfo[]>([]); 
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [chapterInfo, setChapterInfo] = useState<any>(null);
+  const [isDone, setIsDone] = useState<boolean>(false);
   
   const urlCache = useRef<Set<string>>(new Set());
 
@@ -19,11 +30,16 @@ export const useComicReader = (targetUrl: string | null) => {
     if (!targetUrl) return;
 
     let isCancelled = false;
-    
+
+    const historyKey = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
+    const savedPage = parseInt(localStorage.getItem(historyKey) || '0', 10);
+    setCurrentPage(savedPage); 
+
     const load = async () => {
       setLoading(true);
       setError(null);
       setPages([]);
+      setIsDone(false);
       
       urlCache.current.forEach(url => URL.revokeObjectURL(url));
       urlCache.current.clear();
@@ -89,6 +105,7 @@ export const useComicReader = (targetUrl: string | null) => {
           const { done, value } = await reader.read();
           if (done || isCancelled) {
             unzip.push(new Uint8Array(0), true);
+            setIsDone(true);
             break;
           }
           if (value) unzip.push(value);
@@ -110,9 +127,9 @@ export const useComicReader = (targetUrl: string | null) => {
     };
   }, [targetUrl]);
 
-  const goNext = useCallback(() => setCurrentPage(p => Math.min(p + 1, pages.length - 1)), [pages.length]);
+  const goNext = useCallback(() => setCurrentPage(p => Math.min(p + 1, pages.length > 0 ? pages.length - 1 : 0)), [pages.length]);
   const goPrev = useCallback(() => setCurrentPage(p => Math.max(p - 1, 0)), []);
-  const jumpTo = useCallback((p: number) => setCurrentPage(Math.min(Math.max(0, p), pages.length - 1)), [pages.length]);
+  const jumpTo = useCallback((p: number) => setCurrentPage(Math.max(0, p)), []);
 
-  return { loading, error, currentPage, pages, goNext, goPrev, jumpTo, chapterInfo };
+  return { loading, error, currentPage, pages, goNext, goPrev, jumpTo, chapterInfo, isDone };
 };
