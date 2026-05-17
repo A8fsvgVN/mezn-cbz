@@ -1,9 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Unzip, UnzipInflate } from 'fflate';
 
 export interface PageInfo {
     name: string;
     url: string;
+    width?: number;
+    height?: number;
+    isSpread?: boolean;
+}
+
+export interface VirtualPage extends PageInfo {
+    part: 'full' | 'left' | 'right';
+    originalIndex: number;
 }
 
 export const getNormalizedUrl = (url: string) => {
@@ -37,15 +45,40 @@ export const getNormalizedUrl = (url: string) => {
     }
 };
 
-export const useComicReader = (targetUrl: string | null) => {
-  const [pages, setPages] = useState<PageInfo[]>([]); 
-  const [currentPage, setCurrentPage] = useState<number>(0);
+export const useComicReader = (targetUrl: string | null, direction: 'ltr' | 'rtl', smartSplit: boolean) => {
+  const [rawPages, setRawPages] = useState<PageInfo[]>([]); 
+  const [currentVPageIdx, setCurrentVPageIdx] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [chapterInfo, setChapterInfo] = useState<any>(null);
   const [isDone, setIsDone] = useState<boolean>(false);
   
   const urlCache = useRef<Set<string>>(new Set());
+
+  const virtualPages = useMemo(() => {
+      const vPages: VirtualPage[] = [];
+      rawPages.forEach((p, idx) => {
+          if (smartSplit && p.isSpread) {
+              if (direction === 'rtl') {
+                  vPages.push({ ...p, part: 'right', originalIndex: idx });
+                  vPages.push({ ...p, part: 'left', originalIndex: idx });
+              } else {
+                  vPages.push({ ...p, part: 'left', originalIndex: idx });
+                  vPages.push({ ...p, part: 'right', originalIndex: idx });
+              }
+          } else {
+              vPages.push({ ...p, part: 'full', originalIndex: idx });
+          }
+      });
+      return vPages;
+  }, [rawPages, direction, smartSplit]);
+
+  useEffect(() => {
+      setCurrentVPageIdx(prev => {
+          if (virtualPages.length === 0) return prev;
+          return Math.min(prev, virtualPages.length - 1);
+      });
+  }, [virtualPages.length]);
 
   useEffect(() => {
     if (!targetUrl) return;
@@ -59,12 +92,12 @@ export const useComicReader = (targetUrl: string | null) => {
     } catch (e) {
         console.warn("LocalStorage 被浏览器拦截:", e);
     }
-    setCurrentPage(savedPage);
+    setCurrentVPageIdx(savedPage);
 
     const load = async () => {
       setLoading(true);
       setError(null);
-      setPages([]);
+      setRawPages([]);
       setIsDone(false);
       
       urlCache.current.forEach(url => URL.revokeObjectURL(url));
@@ -113,12 +146,26 @@ export const useComicReader = (targetUrl: string | null) => {
                 const url = URL.createObjectURL(blob);
                 urlCache.current.add(url);
                 
-                setPages(prev => {
-                  const newPages = [...prev, { name: file.name, url }];
-                  return newPages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-                });
-                
-                setLoading(false);
+                const img = new Image();
+                img.onload = () => {
+                    const width = img.width;
+                    const height = img.height;
+                    const isSpread = width > height * 1.2;
+                    
+                    setRawPages(prev => {
+                        const newPages = [...prev, { name: file.name, url, width, height, isSpread }];
+                        return newPages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+                    });
+                    setLoading(false);
+                };
+                img.onerror = () => {
+                    setRawPages(prev => {
+                        const newPages = [...prev, { name: file.name, url, isSpread: false }];
+                        return newPages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+                    });
+                    setLoading(false);
+                };
+                img.src = url;
               }
 
               if (file.name.toLowerCase().endsWith('info.json')) {
@@ -158,9 +205,14 @@ export const useComicReader = (targetUrl: string | null) => {
     };
   }, [targetUrl]);
 
-  const goNext = useCallback(() => setCurrentPage(p => Math.min(p + 1, pages.length > 0 ? pages.length - 1 : 0)), [pages.length]);
-  const goPrev = useCallback(() => setCurrentPage(p => Math.max(p - 1, 0)), []);
-  const jumpTo = useCallback((p: number) => setCurrentPage(Math.max(0, p)), []);
+  const goNext = useCallback(() => setCurrentVPageIdx(p => Math.min(p + 1, virtualPages.length > 0 ? virtualPages.length - 1 : 0)), [virtualPages.length]);
+  const goPrev = useCallback(() => setCurrentVPageIdx(p => Math.max(p - 1, 0)), []);
+  const jumpTo = useCallback((p: number) => setCurrentVPageIdx(Math.max(0, p)), []);
 
-  return { loading, error, currentPage, pages, goNext, goPrev, jumpTo, chapterInfo, isDone };
+  return {
+      loading, error, 
+      currentPage: currentVPageIdx, 
+      pages: virtualPages, 
+      goNext, goPrev, jumpTo, chapterInfo, isDone 
+  };
 };

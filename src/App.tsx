@@ -8,6 +8,26 @@ import clsx from 'clsx';
 function App() {
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [direction, setDirection] = useState<'ltr' | 'rtl'>(() => {
+      try { return (localStorage.getItem('mezn-cbz-direction') as 'ltr' | 'rtl') || 'rtl'; }
+      catch(e) { return 'rtl'; }
+  });
+
+  const [smartSplit, setSmartSplit] = useState<boolean>(() => {
+      try {
+          const val = localStorage.getItem('mezn-cbz-smart-split');
+          return val !== null ? val === 'true' : false;
+      } catch(e) { return true; }
+  });
+
+  useEffect(() => {
+      try { localStorage.setItem('mezn-cbz-direction', direction); } catch(e) {}
+  }, [direction]);
+
+  useEffect(() => {
+      try { localStorage.setItem('mezn-cbz-smart-split', String(smartSplit)); } catch(e) {}
+  }, [smartSplit]);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -27,15 +47,14 @@ function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const { loading, error, currentPage, pages, goNext, goPrev, jumpTo, isDone } = useComicReader(targetUrl);
+  const { loading, error, currentPage, pages, goNext, goPrev, jumpTo, isDone } = useComicReader(targetUrl, direction, smartSplit);
   
   const [showControls, setShowControls] = useState(false);
-  const [direction, setDirection] = useState<'ltr' | 'rtl'>('rtl'); 
   const [showHistoryToast, setShowHistoryToast] = useState(false);
   
   const transformComponentRef = useRef<ReactZoomPanPinchRef | null>(null);
   const total = pages.length;
-  const currentUrl = total > currentPage ? pages[currentPage]?.url : null;
+  const currentVirtualPage = total > currentPage ? pages[currentPage] : null;
 
   useEffect(() => {
     if (targetUrl) {
@@ -141,8 +160,21 @@ function App() {
         initialScale={1} minScale={1} maxScale={4} centerOnInit={true}
       >
         <TransformComponent wrapperClass="!w-full !h-full" contentClass="!w-full !h-full flex items-center justify-center">
-          {currentUrl ? (
-             <img src={currentUrl} alt={`P${currentPage}`} className="max-w-full max-h-full object-contain transition-opacity duration-300" />
+          {currentVirtualPage ? (
+             currentVirtualPage.part === 'full' || !currentVirtualPage.width || !currentVirtualPage.height ? (
+                 <img src={currentVirtualPage.url} alt={`P${currentPage}`} className="max-w-full max-h-full object-contain transition-opacity duration-300" />
+             ) : (
+                 <img 
+                     src={currentVirtualPage.url} 
+                     className="max-w-full max-h-full transition-opacity duration-300"
+                     style={{ 
+                         aspectRatio: (currentVirtualPage.width / 2) / currentVirtualPage.height,
+                         objectFit: 'cover',
+                         objectPosition: currentVirtualPage.part === 'left' ? 'left center' : 'right center'
+                     }}
+                     alt={`P${currentPage} ${currentVirtualPage.part}`} 
+                 />
+             )
           ) : (
              <div className="flex flex-col items-center justify-center text-gray-400">
                 <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -189,10 +221,16 @@ function App() {
             <div className="flex justify-between items-center text-sm gap-2">
                 <span>{currentPage + 1} / {total || '?'}</span>
                 <div className="flex gap-2">
-                    <button onClick={() => setDirection(d => d === 'ltr' ? 'rtl' : 'ltr')} className="px-3 py-1 bg-gray-800 rounded">
+                    <button 
+                        onClick={() => setSmartSplit(!smartSplit)} 
+                        className={clsx("px-3 py-1 rounded transition-colors", smartSplit ? "bg-indigo-600 hover:bg-indigo-500" : "bg-gray-700 hover:bg-gray-600")}
+                    >
+                        智能分页
+                    </button>
+                    <button onClick={() => setDirection(d => d === 'ltr' ? 'rtl' : 'ltr')} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors">
                         {direction === 'rtl' ? '日漫' : '普通'}
                     </button>
-                    <button onClick={toggleFullscreen} className="px-3 py-1 bg-blue-600 rounded">全屏</button>
+                    <button onClick={toggleFullscreen} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded transition-colors">全屏</button>
                 </div>
             </div>
         </div>
