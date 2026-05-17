@@ -39,11 +39,13 @@ function App() {
 
   useEffect(() => {
     if (targetUrl) {
-        const key = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
-        const saved = localStorage.getItem(key);
-        if (saved && parseInt(saved) > 0) {
-            setShowHistoryToast(true);
-        }
+        try {
+            const key = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
+            const saved = localStorage.getItem(key);
+            if (saved && parseInt(saved) > 0) {
+                setShowHistoryToast(true);
+            }
+        } catch(e) {}
     }
   }, [targetUrl]);
 
@@ -56,8 +58,10 @@ function App() {
 
   useEffect(() => {
       if (targetUrl && total > 0) {
-           const key = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
-           localStorage.setItem(key, currentPage.toString());
+          try {
+              const key = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
+              localStorage.setItem(key, currentPage.toString());
+          } catch(e) {}
       }
   }, [currentPage, targetUrl, total]);
 
@@ -99,7 +103,7 @@ function App() {
   };
 
   if (!targetUrl) return (
-    <div className="flex flex-col items-center justify-center h-screen w-full bg-black text-gray-400 p-4 gap-6 tracking-wide">
+    <div className="flex flex-col items-center justify-center h-dvh w-full bg-black text-gray-400 p-4 gap-6 tracking-wide">
         <div>在 URL 加上 ?url=CBZ链接</div>
         
         {/* 点击这行文字唤起文件选择器 */}
@@ -122,16 +126,16 @@ function App() {
   );
 
   if (loading) return (
-      <div className="flex flex-col items-center justify-center h-screen w-full bg-black text-white">
+      <div className="flex flex-col items-center justify-center h-dvh w-full bg-black text-white">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
           <div className="text-sm">加载中...</div>
       </div>
   );
   
-  if (error) return <div className="flex items-center justify-center h-screen bg-black text-red-500">{error}</div>;
+  if (error) return <div className="flex items-center justify-center h-dvh bg-black text-red-500">{error}</div>;
 
   return (
-    <div className="h-screen w-screen bg-black relative overflow-hidden select-none" {...swipeHandlers}>
+    <div className="h-dvh w-screen bg-black relative overflow-hidden select-none" {...swipeHandlers}>
       <TransformWrapper
         ref={transformComponentRef}
         initialScale={1} minScale={1} maxScale={4} centerOnInit={true}

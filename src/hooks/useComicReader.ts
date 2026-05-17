@@ -52,9 +52,14 @@ export const useComicReader = (targetUrl: string | null) => {
 
     let isCancelled = false;
 
-    const historyKey = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
-    const savedPage = parseInt(localStorage.getItem(historyKey) || '0', 10);
-    setCurrentPage(savedPage); 
+    let savedPage = 0;
+    try {
+        const historyKey = `mezn-cbz-${getNormalizedUrl(targetUrl)}`;
+        savedPage = parseInt(localStorage.getItem(historyKey) || '0', 10);
+    } catch (e) {
+        console.warn("LocalStorage 被浏览器拦截:", e);
+    }
+    setCurrentPage(savedPage);
 
     const load = async () => {
       setLoading(true);
